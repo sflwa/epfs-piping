@@ -110,7 +110,10 @@ class EPFS_POP3_Handler {
 		$settings_manager = EPFS_Admin_Settings::get_instance();
 		$this->settings   = $settings_manager->get_settings();
 
+		// POP3 Config.
 		$pop3_host      = $this->settings['pop3_host'];
+		$pop3_port      = $this->settings['pop3_port'];
+		$pop3_use_ssl   = $this->settings['pop3_use_ssl'];
 		$pop3_username  = $this->settings['pop3_username'];
 		$pop3_password  = $settings_manager->decrypt_value( $this->settings['pop3_password'] ); // Decrypt here!
 
@@ -119,8 +122,25 @@ class EPFS_POP3_Handler {
 			return;
 		}
 
-		// The mailbox spec for POP3 deletion after fetch. `/pop3` ensures POP3 protocol.
-		$mailbox_spec = '{' . $pop3_host . '/pop3}INBOX';
+		// --- 1. Construct the IMAP connection string ---
+		$mailbox_spec = '{' . $pop3_host;
+		
+		// Append port if set.
+		if ( $pop3_port ) {
+			$mailbox_spec .= ':' . $pop3_port;
+		}
+
+		// Specify protocol.
+		$mailbox_spec .= '/pop3';
+
+		// Append SSL/TLS options.
+		if ( 'yes' === $pop3_use_ssl ) {
+			// Using /ssl for standard POP3/995 connections. /novalidate-cert is often needed.
+			$mailbox_spec .= '/ssl/novalidate-cert'; 
+		}
+
+		// Finalize mailbox path.
+		$mailbox_spec .= '}INBOX';
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Use @ for IMAP functions to handle failures gracefully.
 		$mbox = @imap_open( $mailbox_spec, $pop3_username, $pop3_password );
@@ -372,9 +392,13 @@ class EPFS_POP3_Handler {
 	 */
 	private function send_to_fluentsupport( $data ) {
 		$settings_manager = EPFS_Admin_Settings::get_instance();
-		$api_password = $settings_manager->decrypt_value( $this->settings['api_password'] );
+		$settings = $settings_manager->get_settings();
+		$api_password = $settings_manager->decrypt_value( $settings['api_password'] );
+		
+		// The API Base URL is now constructed dynamically.
+		$api_base_url = rest_url( 'fluent-support/v2/' );
 
-		if ( empty( $this->settings['api_base_url'] ) || empty( $api_password ) ) {
+		if ( empty( $api_password ) ) {
 			error_log( 'EPFS: API credentials or URL missing.' );
 			return 'failed';
 		}
@@ -382,7 +406,7 @@ class EPFS_POP3_Handler {
 		// Determine if this is a reply or a new ticket.
 		if ( $data['ticket_id'] ) {
 			// --- REPLY API CALL ---
-			$api_url = trailingslashit( $this->settings['api_base_url'] ) . 'tickets/' . $data['ticket_id'] . '/responses';
+			$api_url = trailingslashit( $api_base_url ) . 'tickets/' . $data['ticket_id'] . '/responses';
 			$payload = array(
 				'content'           => $data['content'],
 				'conversation_type' => 'response', // Reply to the customer.
@@ -392,12 +416,12 @@ class EPFS_POP3_Handler {
 			// A fallback would be to add a separate agent note with the attachment links if the initial reply fails.
 		} else {
 			// --- NEW TICKET API CALL ---
-			$api_url = trailingslashit( $this->settings['api_base_url'] ) . 'tickets';
+			$api_url = trailingslashit( $api_base_url ) . 'tickets';
 
 			// We use the agent endpoint here to create both customer and ticket in one call.
 			$payload = array(
 				'ticket' => array(
-					'mailbox_id'      => $this->settings['mailbox_id'],
+					'mailbox_id'      => $settings['mailbox_id'],
 					'title'           => $data['subject'],
 					'content'         => $data['content'],
 					'source'          => 'email-pipe', // Custom source to indicate where it came from.
@@ -428,7 +452,8 @@ class EPFS_POP3_Handler {
 			array(
 				'timeout'   => 15, // Longer timeout for potential file transfers.
 				'headers'   => array(
-					'Authorization' => 'Basic ' . base64_encode( $this->settings['api_username'] . ':' . $api_password ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Necessary for Basic Auth.
+					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Necessary for Basic Auth.
+					'Authorization' => 'Basic ' . base64_encode( $settings['api_username'] . ':' . $api_password ), 
 					'Content-Type'  => 'application/json; charset=' . get_option( 'blog_charset' ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Constant defined by core WP.
 				),
 				// FluentSupport REST API typically uses query parameters for ticket creation but JSON body for more complex posts.
