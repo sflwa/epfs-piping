@@ -84,8 +84,8 @@ class EPFS_Plugin_Core {
 	 */
 	public function enqueue_admin_assets() {
 		$screen = get_current_screen();
-
-		if ( 'settings_page_epfs-settings' === $screen->id ) {
+		// Check for the top-level log page (toplevel_page_epfs-piping) OR the settings submenu page (epfs-piping_page_epfs-settings).
+		if ( 'toplevel_page_epfs-piping' === $screen->id || 'epfs-piping_page_epfs-settings' === $screen->id ) {
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Constant defined by core WP.
 			wp_enqueue_style( 'epfs-admin-style', EPFS_URL . 'admin/css/epfs-admin.css', array(), '1.0.0' );
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Constant defined by core WP.
