@@ -158,10 +158,14 @@ class EPFS_Admin_Settings {
 				<h2 class="title"><?php esc_html_e( 'FluentSupport REST API Credentials', 'epfs-piping' ); ?></h2>
 				<table class="form-table">
 					<tr>
-						<th scope="row"><label for="epfs_api_base_url"><?php esc_html_e( 'API Base URL', 'epfs-piping' ); ?></label></th>
+						<th scope="row">
+							<?php esc_html_e( 'API Base URL', 'epfs-piping' ); ?>
+						</th>
 						<td>
-							<input name="epfs_api_base_url" type="url" id="epfs_api_base_url" value="<?php echo esc_attr( $settings['api_base_url'] ); ?>" class="regular-text" placeholder="https://yourdomain.com/wp-json/fluent-support/v2" />
-							<p class="description"><?php esc_html_e( 'Your WordPress REST API base URL for FluentSupport.', 'epfs-piping' ); ?></p>
+							<p class="description">
+								<?php esc_html_e( 'The API URL is automatically set to your site\'s REST endpoint since FluentSupport is on the same site:', 'epfs-piping' ); ?>
+								<br><code><?php echo esc_url( rest_url( 'fluent-support/v2/' ) ); ?></code>
+							</p>
 						</td>
 					</tr>
 					<tr>
@@ -193,7 +197,21 @@ class EPFS_Admin_Settings {
 						<th scope="row"><label for="epfs_pop3_host"><?php esc_html_e( 'POP3 Host', 'epfs-piping' ); ?></label></th>
 						<td>
 							<input name="epfs_pop3_host" type="text" id="epfs_pop3_host" value="<?php echo esc_attr( $settings['pop3_host'] ); ?>" class="regular-text" placeholder="mail.example.com" />
-							<p class="description"><?php esc_html_e( 'E.g., {mail.example.com:995/pop3/ssl/novalidate-cert}. See IMAP documentation for specific format.', 'epfs-piping' ); ?></p>
+							<p class="description"><?php esc_html_e( 'The POP3 server address (e.g., mail.example.com).', 'epfs-piping' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="epfs_pop3_port"><?php esc_html_e( 'POP3 Port', 'epfs-piping' ); ?></label></th>
+						<td>
+							<input name="epfs_pop3_port" type="number" id="epfs_pop3_port" value="<?php echo esc_attr( $settings['pop3_port'] ); ?>" class="small-text" placeholder="995" />
+							<p class="description"><?php esc_html_e( 'Standard ports are 110 (No SSL) or 995 (SSL/TLS).', 'epfs-piping' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="epfs_pop3_use_ssl"><?php esc_html_e( 'Use SSL/TLS', 'epfs-piping' ); ?></label></th>
+						<td>
+							<input name="epfs_pop3_use_ssl" type="checkbox" id="epfs_pop3_use_ssl" value="yes" <?php checked( 'yes', $settings['pop3_use_ssl'] ); ?> />
+							<p class="description"><?php esc_html_e( 'Check this box to use a secure connection (recommended).', 'epfs-piping' ); ?></p>
 						</td>
 					</tr>
 					<tr>
@@ -253,17 +271,23 @@ class EPFS_Admin_Settings {
 
 		// Save/Sanitize the data.
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- $_POST is superglobal.
+		$use_ssl = isset( $_POST['epfs_pop3_use_ssl'] ) ? 'yes' : 'no'; // Normalizing checkbox state.
+
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- $_POST is superglobal.
 		$new_settings = array(
 			// API.
-			'api_base_url'   => esc_url_raw( sanitize_text_field( wp_unslash( $_POST['epfs_api_base_url'] ) ) ),
 			'api_username'   => sanitize_user( wp_unslash( $_POST['epfs_api_username'] ) ),
 			'api_password'   => $this->encrypt_value( wp_unslash( $_POST['epfs_api_password'] ) ), // Encrypt immediately.
 			'mailbox_id'     => absint( wp_unslash( $_POST['epfs_mailbox_id'] ) ),
 			// POP3.
 			'pop3_host'      => sanitize_text_field( wp_unslash( $_POST['epfs_pop3_host'] ) ),
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- $_POST is superglobal.
+			'pop3_port'      => absint( wp_unslash( $_POST['epfs_pop3_port'] ) ),
+			'pop3_use_ssl'   => $use_ssl, // Normalized value.
 			'pop3_username'  => sanitize_text_field( wp_unslash( $_POST['epfs_pop3_username'] ) ),
 			'pop3_password'  => $this->encrypt_value( wp_unslash( $_POST['epfs_pop3_password'] ) ), // Encrypt immediately.
 			// Cron.
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- $_POST is superglobal.
 			'cron_interval'  => absint( wp_unslash( $_POST['epfs_cron_interval'] ) ),
 		);
 
@@ -285,11 +309,14 @@ class EPFS_Admin_Settings {
 	 */
 	public function get_settings() {
 		$defaults = array(
-			'api_base_url'   => '',
+			// Removed api_base_url.
 			'api_username'   => '',
 			'api_password'   => '', // Stored as encrypted.
 			'mailbox_id'     => 1,
+			// New POP3 Fields.
 			'pop3_host'      => '',
+			'pop3_port'      => 995, // Default SSL port.
+			'pop3_use_ssl'   => 'yes', // Default to secure connection.
 			'pop3_username'  => '',
 			'pop3_password'  => '', // Stored as encrypted.
 			'cron_interval'  => 300, // Default 5 minutes.
@@ -302,7 +329,6 @@ class EPFS_Admin_Settings {
 		$settings = wp_parse_args( $settings, $defaults );
 
 		// NOTE: Passwords are not decrypted here for display on the form.
-		// Decryption will happen in the POP3 Handler right before use.
 		return $settings;
 	}
 
