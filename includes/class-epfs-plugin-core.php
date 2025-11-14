@@ -62,14 +62,14 @@ class EPFS_Plugin_Core {
 	 *
 	 * @return void
 	 */
-	private function setup_hooks() {
+	public function setup_hooks() {
 		// Admin hooks.
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'admin_menu', array( EPFS_Admin_Settings::get_instance(), 'add_admin_menu' ) );
 
 		// Plugin activation/deactivation hooks.
-		register_activation_hook( EPFS_PATH . 'email-piping-for-fluentsupport.php', array( $this, 'on_activation' ) );
-		register_deactivation_hook( EPFS_PATH . 'email-piping-for-fluentsupport.php', array( $this, 'on_deactivation' ) );
+		register_activation_hook( EPFS_PATH . 'epfs-piping.php', array( $this, 'on_activation' ) );
+		register_deactivation_hook( EPFS_PATH . 'epfs-piping.php', array( $this, 'on_deactivation' ) );
 
 		// Initialize POP3 Handler and cron setup.
 		EPFS_POP3_Handler::get_instance();
