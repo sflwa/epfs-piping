@@ -1,0 +1,21 @@
+/* Email Piping for FluentSupport Admin Styles */
+.epfs-settings-form table {
+    width: 100%;
+    max-width: 800px;
+}
+
+.epfs-settings-form .regular-text,
+.epfs-settings-form .large-text {
+    width: 100%;
+    max-width: 450px;
+}
+
+.epfs-settings-form .description {
+    font-style: italic;
+    margin-top: 5px;
+    display: block;
+}
+
+.epfs-settings-form .notice {
+    margin-top: 15px;
+}
